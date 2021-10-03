@@ -24,11 +24,12 @@
 #include <bits/stdc++.h> 
 #include <cstdint>
 
-
 using namespace std;
 
+
+namespace sdsl {
 template<typename array_t>
-class initializable_array
+class initializable_array_classic
 {
     uint64_t D; // array size
     array_t init_value;  // value used to initialize the array
@@ -42,10 +43,9 @@ class initializable_array
 
 public:
     
-    initializable_array() = default;
-
+    initializable_array_classic() = default;
     
-    initializable_array(const uint64_t _D, array_t _init_value)
+    initializable_array_classic(const uint64_t _D, array_t _init_value)
     {
         D = _D;
         top = 0;
@@ -55,8 +55,18 @@ public:
         init_value = _init_value;
     };
    
+    void init(const uint64_t _D, array_t _init_value)
+    {
+        D = _D;
+        top = 0;
+        V = new array_t[D];
+        S = new uint64_t[D];
+        U = new uint64_t[D];
+        init_value = _init_value;
+    };
+
  
-    ~initializable_array()
+    ~initializable_array_classic()
     {
         delete [] V;
         delete [] S;
@@ -66,7 +76,10 @@ public:
 
     array_t operator[](const uint64_t i) const
     {
-        //std::cout << "U[i] = " << U[i] << " top = " << top << " S[U[i]] = " << S[U[i]] << " i = " << i << std::endl;
+        if (i >= D) {
+            cerr << "Caution init_array.hpp: index " << i << " is greater than array size " << D << endl;
+        }  
+      //std::cout << "U[i] = " << U[i] << " top = " << top << " S[U[i]] = " << S[U[i]] << " i = " << i << std::endl;
         if (U[i] < top && S[U[i]] == i)
             return V[i];
         else
@@ -75,6 +88,10 @@ public:
 
     array_t atPos(const uint64_t i) const
     {
+         if (i >= D) {
+            cerr << "Caution init_array.hpp function atPos: index " << i << " is greater than array size " << D << endl;
+        }
+
         //std::cout << "U[i] = " << U[i] << " top = " << top << " S[U[i]] = " << S[U[i]] << " i = " << i << std::endl;
         if (U[i] < top && S[U[i]] == i)
             return V[i];
@@ -84,20 +101,133 @@ public:
 
     array_t& operator[](uint64_t i)   
     {
+        if (i >= D) {
+            cerr << "Caution init_array.hpp operator array_t& [uint64_t i]: index " << i << " is greater than array size " << D << endl;
+        }
+
         //std::cout << "Oh! " << i << std::endl; 
         if (U[i] < top && S[U[i]] == i)
             return V[i];
         else {
             U[i] = top;
             S[top++] = i;
+            V[i] = init_value;   // OJO, revisar esto
             return V[i];
         }
     };
 
+    
 
     uint64_t size()
     {
         return D;
     };
+
+    uint64_t size_in_bytes()
+    {
+        return sizeof(array_t)*D + sizeof(array_t) + 3*sizeof(uint64_t)*D + sizeof(uint64_t) + 3*sizeof(uint64_t*);  
+    };
+
 };
+
+
+template<typename array_t>
+class initializable_array
+{
+    uint64_t n; // array size
+    array_t init_value;  // value used to initialize the array
+
+    array_t* A;  // array
+
+    initializable_array_classic<uint64_t> W;
+
+public:
+
+    initializable_array() = default;
+
+    initializable_array(const uint64_t _n, array_t _init_value)
+    {
+        n = _n;
+        A = new array_t[n];
+        init_value = _init_value;
+        W.init((n+63)/64, 0); // = initializable_array_classic<uint64_t>((n+63)/64 + 1, 0);
+    };
+
+    ~initializable_array()
+    {
+        delete [] A;
+    };
+
+   array_t operator[](const uint64_t i) const
+    {
+        //if (i >= D) {
+        //    cerr << "Caution init_array.hpp: index " << i << " is greater than array size " << D << endl;
+        //}
+        //std::cout << "U[i] = " << U[i] << " top = " << top << " S[U[i]] = " << S[U[i]] << " i = " << i << std::endl;
+        //cout << "[ ]" << i << " " << n <<std::endl;
+        //register uint64_t temp = W.atPos(i/64); 
+        /*if (!temp)
+            return init_value;
+        else {*/
+            if ((W.atPos(i/64)>>(i%64/*&0x3F*/)) & 1ull) {
+	        return A[i];
+            }
+            else 
+	        return init_value;
+        /*}*/
+    };
+
+    array_t atPos(const uint64_t i) const
+    {
+        //if (i >= D) {
+        //    cerr << "Caution init_array.hpp function atPos: index " << i << " is greater than array size " << D << endl;
+        //}
+
+        //std::cout << "U[i] = " << U[i] << " top = " << top << " S[U[i]] = " << S[U[i]] << " i = " << i << std::endl;
+        //cout << "[ ]" << i << " " << n <<std::endl;
+        //register uint64_t temp = W.atPos(i/64);
+        /*if (!temp)
+            return init_value;
+        else {*/
+            if ((W.atPos(i/64)>>(i%64/*&0x3F*/)) & 1ull) {
+                return A[i];
+            }
+            else 
+                return init_value;
+        //}
+    };
+
+    array_t& operator[](uint64_t i)
+    {
+        //if (i >= D) {
+        //    cerr << "Caution init_array.hpp operator array_t& [uint64_t i]: index " << i << " is greater than array size " << D << endl;
+        //}
+
+        //std::cout << "[ ]" << i << " " << n <<std::endl; 
+        register uint64_t temp = W.atPos(i/64);
+        if ((/*W.atPos(i/64)*/temp>>(i%64/*&0x3F*/)) & 1ull) {
+            return A[i];
+        }
+        else {
+            W[i/64] = /*W.atPos(i/64)*/ temp | (1ull<<(i%64/*&0x3F*/));       
+            A[i] = init_value;
+            return A[i];
+        }
+    };
+
+    // number of elements in the array
+    uint64_t size()
+    {
+        return n;
+    };
+
+    uint64_t size_in_bytes() 
+    {
+        return sizeof(array_t)*n + W.size_in_bytes() + sizeof(array_t) + sizeof(array_t *) + sizeof(uint64_t);
+    };
+
+};
+
+}
+
 #endif

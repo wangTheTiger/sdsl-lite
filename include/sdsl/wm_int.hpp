@@ -701,6 +701,21 @@ class wm_int
             return res_vec;
         }
 
+        // Implemented by Diego Arroyuelo
+        void 
+        all_values_in_range_bounded(size_type lb, size_type rb, 
+                                    std::vector<value_type>& res_vec, 
+                                    size_type bound, bool report=true) const
+        {
+	    size_type cnt_answers = 0;
+	    if (lb <= rb)  {
+		_all_values_in_range_bounded(root(), {lb, rb}, 0, res_vec, report, 
+                                             cnt_answers, bound);
+	    }
+	}
+	
+	
+
 
         // implemented by Diego Arroyuelo
         void
@@ -741,6 +756,42 @@ class wm_int
         }
 
 
+        // implemented by Diego Arroyuelo
+        void
+        _all_values_in_range_bounded(node_type v, range_type r,
+                         size_type ilb, //std::vector<size_type>& is,
+                         //std::vector<size_type>& rank_off,
+                         std::vector<value_type>& res_vec,
+                         bool report, size_type& cnt_answers, size_type bound)
+        const
+        {
+
+            using std::get;
+            if ((get<0>(r) > get<1>(r)) or (cnt_answers >= bound))
+                return;
+
+            if (v.level == m_max_level) {
+                res_vec.emplace_back(v.sym);
+                cnt_answers += 1;
+                return;
+            } 
+              
+            size_type irb = ilb + (1ULL << (m_max_level-v.level));
+            size_type mid = (irb + ilb)>>1;
+
+            auto c_v = expand(v);
+            auto c_r = expand(v, r);
+
+            if (!sdsl::empty(get<0>(c_r)) and mid) {
+                _all_values_in_range_bounded(get<0>(c_v),get<0>(c_r), ilb, //is,
+                                 /*rank_off,*/ res_vec, report, cnt_answers, bound);
+            }
+            if (!sdsl::empty(get<1>(c_r))) {
+                _all_values_in_range_bounded(get<1>(c_v), get<1>(c_r), mid, /*is,*/
+                                     /*rank_off,*/ res_vec, report, cnt_answers, bound);
+            }
+        }
+
         // Implemented by Diego Arroyuelo
         template<typename word_t>
         std::vector<value_type>
@@ -777,15 +828,15 @@ class wm_int
             using std::get;
             if (get<0>(r) > get<1>(r))
                 return;
-            is[v.level] = v.offset + get<0>(r);
+            //is[v.level] = v.offset + get<0>(r);
 
             if (v.level == m_max_level) {
                 res_vec.emplace_back(v.sym);
                 cnt_answers += 1; // sdsl::size(r);
                 return;
-            } else {
+            } /*else {
                 rank_off[v.level] = m_tree_rank(is[v.level]);
-            }
+            }*/
             size_type irb = ilb + (1ULL << (m_max_level-v.level));
             size_type mid = (irb + ilb)>>1;
 
@@ -801,6 +852,63 @@ class wm_int
                 _all_active_p_values_in_range(get<1>(c_v), get<1>(c_r),
                                  mid, is, rank_off, res_vec, report,
                                  cnt_answers, B_wt, D, 2*pos_in_B_wt+1);
+            }
+        }
+
+        template<typename word_t>
+        void
+        all_active_p_values_in_range_test(size_type lb, size_type rb,
+                                   std::vector<word_t>& B_wt, word_t D,
+                                   std::vector<std::pair<value_type, std::pair<size_type, size_type>>>& res_vec
+                                   ) const
+        {
+
+            size_type cnt_answers = 0;
+            if (lb <= rb) {
+                _all_active_p_values_in_range_test<word_t>(root(), {lb, rb}, 0, 
+                                     res_vec, /*cnt_answers,*/ B_wt, D, 1);
+            }
+        }
+
+
+        template<typename word_t>
+        void
+        _all_active_p_values_in_range_test(node_type v, range_type r, size_type ilb, 
+                         std::vector<std::pair<value_type, std::pair<size_type, size_type>>>& res_vec,
+                         /*size_type& cnt_answers,*/ std::vector<word_t>& B_wt,
+                         word_t D, uint64_t pos_in_B_wt)
+        const
+        {
+            if (!(B_wt[pos_in_B_wt] & D)) return; 
+
+            using std::get;
+            if (get<0>(r) > get<1>(r))
+                return;
+
+            if (v.level == m_max_level) {
+                res_vec.emplace_back(std::pair<value_type,std::pair<size_type, size_type>>
+		                     (
+                                      v.sym, std::pair<size_type,size_type>(get<0>(r), get<0>(r)+sdsl::size(r)/*-1*/
+				     )));
+                //cnt_answers += 1; // sdsl::size(r);
+                return;
+            }
+            
+            size_type irb = ilb + (1ULL << (m_max_level-v.level));
+            size_type mid = (irb + ilb)>>1;
+
+            auto c_v = expand(v);
+            auto c_r = expand(v, r);
+
+            if (!sdsl::empty(get<0>(c_r)) and  mid) {
+                _all_active_p_values_in_range_test<word_t>(get<0>(c_v),get<0>(c_r),
+                                 ilb,
+                                 res_vec, /*report, cnt_answers,*/ B_wt, D, 2*pos_in_B_wt);
+            }
+            if (!sdsl::empty(get<1>(c_r))) {
+                _all_active_p_values_in_range_test<word_t>(get<1>(c_v), get<1>(c_r), 
+                                 mid, res_vec, /*report,*/
+                                 /*cnt_answers,*/ B_wt, D, 2*pos_in_B_wt+1);
             }
         }
 
@@ -824,6 +932,90 @@ class wm_int
             return res_vec;
         }
 
+        template<typename word_t>
+        //std::vector<std::pair<value_type, std::pair<size_type, size_type>>>
+        //std::vector<tuple<value_type, word_t, std::pair<size_type, size_type>>>
+        void
+        all_active_s_values_in_range_test(size_type lb, size_type rb,
+                                   initializable_array<word_t>& D_wt, word_t D,
+                                   std::vector<tuple<value_type, word_t, std::pair<size_type, size_type>>>& res_vec,
+                                   bool report=true) const
+        {
+            size_type cnt_answers = 0;
+            //std::vector<tuple<value_type, word_t, std::pair<size_type, size_type>>> res_vec;
+            if (lb <= rb) {
+                //std::vector<size_type> is(m_max_level+1);
+                //std::vector<size_type> rank_off(m_max_level+1);
+                _all_active_s_values_in_range_test(root(), {lb, rb}, 0, /*is,
+                                 rank_off,*/ res_vec, report, cnt_answers, D_wt, D, 1);
+            }
+            //return res_vec;
+        }
+
+        template <typename word_t>
+        word_t
+        _all_active_s_values_in_range_test(node_type v, range_type r, size_type ilb, /*std::vector<size_type>& is,
+                         std::vector<size_type>& rank_off,*/ 
+                         std::vector<std::tuple<
+                                                value_type,
+						word_t,
+						std::pair<size_type,size_type>>>& res_vec,
+                         bool report, size_type& cnt_answers, initializable_array<word_t>& D_wt,
+                         word_t D, uint64_t pos_in_D_wt)
+        const
+        {
+            word_t Dtemp = D_wt.atPos(pos_in_D_wt); 
+            if ((Dtemp | D) == Dtemp) return Dtemp;  
+
+            //D_wt[pos_in_D_wt] = /*D_wt.atPos(pos_in_D_wt)*/ Dtemp | (D & ~Dtemp);
+
+            using std::get;
+            if (get<0>(r) > get<1>(r))
+                return Dtemp;
+
+            if (v.level == m_max_level) {
+                D = D & ~Dtemp;//    D_wt.atPos(pos_in_D_wt);
+                word_t answ = D_wt[pos_in_D_wt] = /*D_wt.atPos(pos_in_D_wt)*/ Dtemp | D;
+                res_vec.emplace_back(std::tuple<value_type, word_t,std::pair<size_type, size_type>>
+                                     (v.sym, D,
+                                      std::pair<size_type,size_type>(get<0>(r), get<0>(r)+sdsl::size(r))
+				     ));
+                cnt_answers += 1; // sdsl::size(r);
+                return answ;
+            } 
+            size_type irb = ilb + (1ULL << (m_max_level-v.level));
+            size_type mid = (irb + ilb)>>1;
+
+            auto c_v = expand(v);
+            auto c_r = expand(v, r);
+       
+            //D_wt[pos_in_D_wt] = /*D_wt.atPos(pos_in_D_wt)*/ Dtemp | D;
+            word_t answ1, answ2;
+            if (!sdsl::empty(get<0>(c_r)) and  mid) {
+                answ1 = _all_active_s_values_in_range_test(get<0>(c_v),get<0>(c_r),
+                                 ilb, res_vec, report, cnt_answers, D_wt, D, 2*pos_in_D_wt);
+            } else
+                answ1 = Dtemp; //D_wt.atPos(2*pos_in_D_wt);
+
+            if (!sdsl::empty(get<1>(c_r))) {
+                answ2 = _all_active_s_values_in_range_test(get<1>(c_v), get<1>(c_r),
+                                 mid, res_vec, report,
+                                 cnt_answers, D_wt, D, 2*pos_in_D_wt+1);
+            } else
+                answ2 = Dtemp; // D_wt.atPos(2*pos_in_D_wt+1);
+
+            /*word_t answ =*/ D_wt[pos_in_D_wt] = answ1 & answ2; 
+            /*if (D_wt[pos_in_D_wt] != (D_wt.atPos(2*pos_in_D_wt) & D_wt.atPos(2*pos_in_D_wt+1))) {
+                cout << "son distintos en posicion " << pos_in_D_wt << endl;
+                cout << D_wt[pos_in_D_wt] << " versus " << (D_wt.atPos(2*pos_in_D_wt) & D_wt.atPos(2*pos_in_D_wt+1)) << endl;
+                uint64_t j;
+                cin >> j;
+            }*/
+            return answ1 & answ2; //answ;
+        }
+
+
+
 
         // implemented by Diego Arroyuelo
         template <typename word_t>
@@ -842,7 +1034,7 @@ class wm_int
             using std::get;
             if (get<0>(r) > get<1>(r))
                 return;
-            is[v.level] = v.offset + get<0>(r);
+            //is[v.level] = v.offset + get<0>(r);
 
             if (v.level == m_max_level) {
                 D = D & ~D_wt.atPos(pos_in_D_wt);
@@ -850,9 +1042,9 @@ class wm_int
                 res_vec.emplace_back(std::pair<value_type, word_t>(v.sym,D));
                 cnt_answers += 1; // sdsl::size(r);
                 return;
-            } else {
+            } /*else {
                 rank_off[v.level] = m_tree_rank(is[v.level]);
-            }
+            }*/
             size_type irb = ilb + (1ULL << (m_max_level-v.level));
             size_type mid = (irb + ilb)>>1;
 
