@@ -505,115 +505,89 @@ class wm_int
 	    }
 	}
 
-		value_type range_next_value(value_type x, size_type i, size_type j) const
-		{
-		        if (((1ULL)<<(m_max_level))<=x) { // c is greater than any symbol in wt
-                	    return 0;
-            		}
-			return _range_next_value(x, i, j, 0, 0, 0);
-		};
+        // Implemented by Diego Arroyuelo
+	value_type range_next_value(value_type x, size_type i, size_type j) const
+	{
+            if (((1ULL)<<(m_max_level))<=x) { // c is greater than any symbol in wt
+                return 0;
+            }
+            return _range_next_value(x, i, j, 0, 0, 0);
+        };
 
 
-		value_type _range_next_value_min(size_type i, size_type j, 
-	  					 uint32_t depth, size_type b,
-						 value_type res) const
-		{
-				
-				if (b+i > b+j)
-					return 0;//res-1;  // OJO con el -1, ver
-			        if (depth == m_max_level)
-					return res;
-				else {
-					size_type rank_0_b = m_tree_rank(b); // ones in [0..b)
-					size_type rank_b_i = m_tree_rank(b + i) - rank_0_b; // ones in [b..i) 
-					size_type rank_b_j = m_tree_rank(b + j + 1) - rank_0_b;
-					size_type ones_p   = rank_0_b - m_rank_level[depth];
+	value_type _range_next_value_min(size_type i, size_type j, 
+                                         uint32_t depth, size_type b,
+                                         value_type res) const
+        {
+				 
+            if (b+i > b+j) return 0;
+
+            if (depth == m_max_level)
+                return res;
+            else {
+                size_type rank_0_b = m_tree_rank(b); // ones in [0..b)
+                size_type rank_b_i = m_tree_rank(b + i) - rank_0_b; // ones in [b..i) 
+                size_type rank_b_j = m_tree_rank(b + j + 1) - rank_0_b;
+                size_type ones_p   = rank_0_b - m_rank_level[depth];
  
-					size_type i_l = i - rank_b_i; // zeroes in [b..i)
-					size_type j_l = j - rank_b_j;
-					size_type i_r = i - i_l;
-					size_type j_r = j - 1 - j_l;
-					size_type n_l = j_l - i_l + 1;
+                size_type i_l = i - rank_b_i; // zeroes in [b..i)
+                size_type j_l = j - rank_b_j;
+                size_type i_r = i - i_l;
+                size_type j_r = j - 1 - j_l;
+                size_type n_l = j_l - i_l + 1;
 
-					res <<= 1;
-					if (n_l == 0) { // no left child, recurse on the rigth child
-						b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
-						res |= 1;
-						return _range_next_value_min(i_r, j_r, depth+1, b, res);
-					}
-					else { // recurse on the left child
-						b = (depth+1)*m_size + (b - depth*m_size - ones_p);	
-						return _range_next_value_min(i_l, j_l, depth+1, b, res);
-					}
-				}
-		}
+                res <<= 1;
+                if (n_l == 0) { // no left child, recurse on the rigth child
+                    b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
+                    res |= 1;
+                    return _range_next_value_min(i_r, j_r, depth+1, b, res);
+                } else { // recurse on the left child
+                    b = (depth+1)*m_size + (b - depth*m_size - ones_p);	
+                    return _range_next_value_min(i_l, j_l, depth+1, b, res);
+                }
+            }
+        };
 
 
-		value_type _range_next_value(value_type x, size_type i, size_type j, 
-					     uint32_t depth, size_type b,
-					     value_type res) const
-		{
-			//std::cout << b+i << " " << b+j << std::endl;
+        value_type _range_next_value(value_type x, size_type i, size_type j, 
+                                     uint32_t depth, size_type b,
+                                     value_type res) const
+        {
+            if (b+i > b+j) 
+                return 0;
+            else 
+                if (depth == m_max_level)
+                    return res;
+                else {
+                    size_type rank_0_b = m_tree_rank(b); // ones in [0..b)
+                    size_type rank_b_i = m_tree_rank(b + i) - rank_0_b; // ones in [b..i) 
+                    size_type rank_b_j = m_tree_rank(b + j + 1) - rank_0_b;
+                    size_type ones_p   = rank_0_b - m_rank_level[depth];
+		    size_type i_l = i - rank_b_i; // zeroes in [b..i)
+                    size_type j_l = j - rank_b_j;
+                    size_type i_r = i - i_l;
+                    size_type j_r = j - 1 - j_l;
 
-                        /*uint64_t l, a, p_abs=0;
-			for (l=0; l < m_max_level; l++) {
-				std::cout << "B_" << l+1 << ": ";
-			    for (a=0; a < m_size && p_abs < m_tree.size(); a++ )
-				std::cout << m_tree[p_abs++];
-			    std::cout << std::endl;
-			} 
-                        exit(1);*/
-			if (b+i > b+j) { 
-				//std::cout << "OK failed and returns " << x-1 << std::endl; 
-				return 0;//x-1; // an invalid value
-			}
-			else 
-				if (depth == m_max_level) {
-					//std::cout << "x: " << x << " res: " << res << std::endl;
-					return res; // x; // OJO, puede ser res en lugar de x
-				}
-				else {
-					size_type rank_0_b = m_tree_rank(b); // ones in [0..b)
-					size_type rank_b_i = m_tree_rank(b + i) - rank_0_b; // ones in [b..i) 
-					size_type rank_b_j = m_tree_rank(b + j + 1) - rank_0_b;
-					size_type ones_p   = rank_0_b - m_rank_level[depth];
- 
-					//std::cout << "rank_0_b:" << rank_0_b << " rank_b_i:" << rank_b_i << " rank_b_j:" << rank_b_j << std::endl;
-					size_type i_l = i - rank_b_i; // zeroes in [b..i)
-					size_type j_l = j - rank_b_j;
-					size_type i_r = i - i_l;
-					size_type j_r = j - 1 - j_l;
-					//size_type n_l = j_l - i_l + 1;
+                    uint64_t mask = (1ULL) << (m_max_level-1-depth);
+                    res <<= 1;
+                    if (x & mask) { // recurse on the rigth child
+                        b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
+                        res |= 1;
+                        return _range_next_value(x, i_r, j_r, depth+1, b, res);
+                    } else { // recurse on the left child
+                        b = (depth+1)*m_size + (b - depth*m_size - ones_p); 
+                        value_type y = _range_next_value(x, i_l, j_l, depth+1, b, res);
 
-					uint64_t mask = (1ULL) << (m_max_level-1-depth);
-					res <<= 1;
-					//std::cout << mask << std::endl;
-					if (x & mask) { // recurse on the rigth child
-						//std::cout << "right" << std::endl;
-						b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
-						res |= 1;
-						return _range_next_value(x, i_r, j_r, depth+1, b, res);
-					}
-					else { // recurse on the left child
-						//std::cout << "left" << std::endl;
-						b = (depth+1)*m_size + (b - depth*m_size - ones_p); 
-						value_type y = _range_next_value(x, i_l, j_l, depth+1, b, res);
-					        //std::cout << "y="<<y<<std::endl;
-
-						if (y != 0/*y != x-1*/)
-							return y;
-						else {
-							//std::cout << "Failed left, go right" << std::endl;
-							b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
-							res |= 1;
-							return _range_next_value_min(i_r, j_r, depth+1, b, res);
-							//return _range_next_value(res, i_r, j_r, depth+1, b, res);
-						}
-	
-					}
-				}
-						
-		}
+                        if (y != 0)
+                            return y;
+                        else {
+                            b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
+                            res |= 1;
+                            return _range_next_value_min(i_r, j_r, depth+1, b, res);
+                        }
+                    }
+                }					
+        };
 
         // Implemented by Diego Arroyuelo
         template<typename word_t>
@@ -689,7 +663,6 @@ class wm_int
         std::vector<value_type>
         all_values_in_range(size_type lb, size_type rb, bool report=true) const
         {
-
             size_type cnt_answers = 0;
             std::vector<value_type> res_vec;
             if (lb <= rb) {
@@ -1066,6 +1039,74 @@ class wm_int
 
         }
 
+        // Implemented by Diego Arroyuelo
+        size_type
+        rel_min_obj_maj(value_type vlb, value_type vrb, size_type lb) const
+        {
+            if (vrb > (1ULL << m_max_level))
+                vrb = (1ULL << m_max_level);
+            if (vlb > vrb)
+                return m_size+1;
+
+            size_type ans = m_size+1;
+            if (lb < m_size) {
+                ans = _rel_min_obj_maj(root(), vlb, vrb, {lb,m_size-1}, 0);
+            }
+            return ans;
+        }
+
+        size_type
+        _rel_min_obj_maj(node_type v, value_type vlb, value_type vrb, 
+                         range_type r, size_type ilb)
+        const
+        {
+            using std::get;
+            //std::cout << "[" << get<0>(r) << "," << get<1>(r) << "]" << std::endl; 
+            if (get<0>(r) > get<1>(r))
+                return m_size+1;  // OJO con el +1, puede estar de mas
+
+            if (v.level == m_max_level) {
+                //std::cout << "Retorna " << get<0>(r) << std::endl;
+                return get<0>(r); // cuidado con esto
+            } 
+            size_type irb = ilb + (1ULL << (m_max_level-v.level));
+            size_type mid = (irb + ilb)>>1;
+
+            auto c_v = expand(v);
+            auto c_r = expand(v, r);
+
+            size_type ans1 = m_size + 1, ans2 = m_size+1;
+            if (!sdsl::empty(get<0>(c_r)) and  vlb < mid and mid) {
+               //std::cout << "if 1" << std::endl;
+               ans1 =  _rel_min_obj_maj(get<0>(c_v), vlb, std::min(vrb,mid-1), get<0>(c_r), ilb);
+               //std::cout << ans1 << std::endl;
+               if (ans1 != m_size+1) {
+               /*    std::cout << "**************************" << std::endl;
+                   std::cout << "ans1 ans1="<< ans1 << std::endl;
+                   std::cout << "ans1 offset=" << v.offset << std::endl;
+                   std::cout << "ans1 rank=" << m_tree_rank(v.offset) << std::endl;
+                   std::cout << "ans1 select=" << m_tree_select0(v.offset-m_tree_rank(v.offset) + ans1 + 1) << std::endl;*/
+                   ans1 = m_tree_select0(v.offset-m_tree_rank(v.offset) + ans1 + 1) - v.offset; 
+               }
+               //std::cout << "ans1=" << ans1 << std::endl;
+            }
+            if (!sdsl::empty(get<1>(c_r)) and vrb >= mid) {
+               //std::cout << "if 2" << std::endl;
+               ans2 = _rel_min_obj_maj(get<1>(c_v), std::max(mid, vlb), vrb, get<1>(c_r), mid);
+               //std::cout << ans2 << std::endl;
+               if (ans2 != m_size+1) {
+                  /* std::cout << "**************************" << std::endl;
+                   std::cout << "ans2 ans2="<< ans2 << std::endl;
+                   std::cout << "ans2 offset=" << v.offset << std::endl;
+                   std::cout << "ans2 rank=" << m_tree_rank(v.offset) << std::endl;
+                   std::cout << "ans2 select=" << m_tree_select1(m_tree_rank(v.offset) + ans2 +1) << std::endl;*/
+                   ans2 = m_tree_select1(m_tree_rank(v.offset) + ans2 + 1) - v.offset;
+               }
+               //std::cout << "ans2=" << ans2 << std::endl;
+            }
+            
+            return (ans1 < ans2)? ans1:ans2;
+        }
 
 
         //! range_search_2d searches points in the index interval [lb..rb] and value interval [vlb..vrb].
