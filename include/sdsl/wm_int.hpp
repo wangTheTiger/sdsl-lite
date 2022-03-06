@@ -519,7 +519,6 @@ class wm_int
                                          uint32_t depth, size_type b,
                                          value_type res) const
         {
-				 
             if (b+i > b+j) return 0;
 
             if (depth == m_max_level)
@@ -588,6 +587,111 @@ class wm_int
                     }
                 }					
         };
+
+
+        // Implemented by Diego Arroyuelo
+        size_type range_next_value_pos(value_type x, size_type i, size_type j) 
+        {
+            if (((1ULL)<<(m_max_level))<=x) { // c is greater than any symbol in wt
+                return 0;
+            }
+            size_type pos;
+            value_type temp = _range_next_value_pos(x, i, j, 0, 0, 0, pos);
+            return pos-1;
+        };
+
+
+        value_type _range_next_value_min_pos(size_type i, size_type j,
+                                              uint32_t depth, size_type b,
+                                              value_type res, size_type& pos)
+        {
+            if (b+i > b+j) return 0;
+
+            if (depth == m_max_level) {
+	        pos = i+1;
+                return res;
+            }		
+            else {
+                size_type rank_0_b = m_tree_rank(b); // ones in [0..b)
+                size_type rank_b_i = m_tree_rank(b + i) - rank_0_b; // ones in [b..i)
+                size_type rank_b_j = m_tree_rank(b + j + 1) - rank_0_b;
+                size_type ones_p   = rank_0_b - m_rank_level[depth];
+
+                size_type i_l = i - rank_b_i; // zeroes in [b..i)
+                size_type j_l = j - rank_b_j;
+                size_type i_r = i - i_l;
+                size_type j_r = j - 1 - j_l;
+                size_type n_l = j_l - i_l + 1;
+
+                res <<= 1;
+                if (n_l == 0) { // no left child, recurse on the rigth child
+                    size_type ant_b = b;
+                    b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
+                    res |= 1;
+                    value_type temp = _range_next_value_min_pos(i_r, j_r, depth+1, b, res, pos);
+		    pos = m_tree_select1(rank_0_b + pos) - ant_b + 1;
+		    return temp;
+                } else { // recurse on the left child
+                    size_type ant_b = b;
+                    b = (depth+1)*m_size + (b - depth*m_size - ones_p);
+                    value_type temp = _range_next_value_min_pos(i_l, j_l, depth+1, b, res, pos);
+                    pos = m_tree_select0(pos + ant_b-(rank_0_b)) - ant_b + 1;
+		    return temp;
+                }
+            }
+        };
+
+        value_type _range_next_value_pos(value_type x, size_type i, size_type j,
+                                          uint32_t depth, size_type b,
+                                          value_type res, size_type& pos) 
+        {
+            if (b+i > b+j)
+                return 0;
+            else
+                if (depth == m_max_level) {
+		    pos = i+1;
+                    return res;
+                } else {
+                    size_type rank_0_b = m_tree_rank(b); // ones in [0..b)
+                    size_type rank_b_i = m_tree_rank(b + i) - rank_0_b; // ones in [b..i)
+                    size_type rank_b_j = m_tree_rank(b + j + 1) - rank_0_b;
+                    size_type ones_p   = rank_0_b - m_rank_level[depth];
+                    size_type i_l = i - rank_b_i; // zeroes in [b..i)
+                    size_type j_l = j - rank_b_j;
+                    size_type i_r = i - i_l;
+                    size_type j_r = j - 1 - j_l;
+
+                    uint64_t mask = (1ULL) << (m_max_level-1-depth);
+                    res <<= 1;
+                    if (x & mask) { // recurse on the rigth child
+                        size_type ant_b = b;
+                        b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
+                        res |= 1;
+                        value_type temp = _range_next_value_pos(x, i_r, j_r, depth+1, b, res, pos);
+			pos = m_tree_select1(rank_0_b + pos) - ant_b + 1;
+			return temp;
+                        
+                    } else { // recurse on the left child
+                        size_type ant_b = b;
+                        b = (depth+1)*m_size + (b - depth*m_size - ones_p);
+                        value_type y = _range_next_value_pos(x, i_l, j_l, depth+1, b, res, pos);
+
+                        if (y != 0) {
+                            pos = m_tree_select0(pos + ant_b-(rank_0_b)) - ant_b + 1;
+                            return y;
+                        }
+                        else {
+                            b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
+                            res |= 1;
+                            value_type temp = _range_next_value_min_pos(i_r, j_r, depth+1, b, res, pos);
+                            pos = m_tree_select1(pos + rank_0_b) - ant_b + 1;
+			    return temp;
+                        }
+                    }
+                }
+        };
+
+
 
         // Implemented by Diego Arroyuelo
         template<typename word_t>
@@ -1062,49 +1166,121 @@ class wm_int
         {
             using std::get;
             //std::cout << "[" << get<0>(r) << "," << get<1>(r) << "]" << std::endl; 
-            if (get<0>(r) > get<1>(r))
+            if (get<0>(r)+1 > get<1>(r)+1)
+                return m_size+1;  // OJO con el +1, puede estar de mas
+
+            if (v.level == m_max_level) {
+                return get<0>(r); // cuidado con esto
+            } 
+            size_type irb = ilb + /*std::min(m_sigma-2,*/(size_type)(1ULL << (m_max_level-v.level))/*)*/;
+            size_type mid = (irb + ilb)>>1;
+
+            /*std::cout << "[" << ilb << "," << std::min(irb,m_sigma-1) << "] versus [" << vlb << "," << vrb << "]" << std::endl;
+            char c;
+            std::cin >> c;*/
+            
+            if (vlb <= ilb and std::min(irb-1,m_sigma-1) <= vrb) {
+                /*std::cout << "[" << ilb << "," << std::min(irb-1,m_sigma-1) << "] is included in [" << vlb << "," << vrb << "]" << std::endl;
+                char d;
+                std::cin >> d;*/
+                return get<0>(r);
+            }
+
+            std::array<range_type, 2> c_r;
+            size_type rnk;
+            auto c_v = my_expand(v, r, c_r[0], c_r[1], rnk);
+
+            size_type ans1 = m_size + 1, old_ans1 = m_size + 1, ans2 = m_size + 1;
+            if (!sdsl::empty(get<0>(c_r)) and  vlb < mid and mid) {
+               old_ans1 =  _rel_min_obj_maj(get<0>(c_v), vlb, std::min(vrb,mid-1), get<0>(c_r), ilb);
+               if (old_ans1 != m_size + 1) 
+                   ans1 = m_tree_select0(v.offset-rnk + old_ans1 + 1) - v.offset; 
+            }
+            if (!sdsl::empty(get<1>(c_r)) and vrb >= mid) {
+               if (ans1 != m_size + 1) {
+                   uint64_t min = (get<1>(get<1>(c_r)) < get<0>(get<1>(c_r))+ans1-old_ans1-1)?get<1>(get<1>(c_r)):get<0>(get<1>(c_r))+ans1-old_ans1-1;
+                   ans2 =  _rel_min_obj_maj(get<1>(c_v), std::max(mid, vlb), vrb, {get<0>(get<1>(c_r)), min}, mid);
+                   if (ans2 == m_size + 1)
+                       return ans1;
+                   else 
+                       ans2 = m_tree_select1(rnk + ans2 + 1) - v.offset;
+               } else {
+                   ans2 = _rel_min_obj_maj(get<1>(c_v), std::max(mid, vlb), vrb, get<1>(c_r), mid);
+                   if (ans2 != m_size + 1) 
+                      ans2 = m_tree_select1(rnk + ans2 + 1) - v.offset;
+               }
+            }
+            
+            return (ans1 < ans2)? ans1:ans2;
+        }
+
+
+        size_type
+        _rel_min_obj_maj_ant(node_type v, value_type vlb, value_type vrb,
+                         range_type r, size_type ilb)
+        const
+        {
+            using std::get;
+            /*std::cout << "[" << get<0>(r) << "," << get<1>(r) << "]" << std::endl;
+            char a;
+            std::cin >> a;*/
+            if (get<0>(r)+1 > get<1>(r)+1)
                 return m_size+1;  // OJO con el +1, puede estar de mas
 
             if (v.level == m_max_level) {
                 //std::cout << "Retorna " << get<0>(r) << std::endl;
                 return get<0>(r); // cuidado con esto
-            } 
+            }
             size_type irb = ilb + (1ULL << (m_max_level-v.level));
             size_type mid = (irb + ilb)>>1;
 
             auto c_v = expand(v);
             auto c_r = expand(v, r);
 
-            size_type ans1 = m_size + 1, ans2 = m_size+1;
+            //std::cout << " > Los hijos del nodo actual son [" << get<0>(get<0>(c_r)) << "," << get<1>(get<0>(c_r)) << "] y [" << get<0>(get<1>(c_r)) << "," << get<1>(get<1>(c_r)) << "]" << std::endl;  
+
+
+            size_type ans1 = m_size + 1, ans2 = m_size + 1;
+            size_type rnk = m_size + 1;
+            /*std::cout << " > Rango de simbolos = [" << vlb << "," << vrb << "]" << std::endl;
+            std::cout << " > Se divide en los rangos [" << vlb << "," << std::min(vrb, mid-1) << "] y [" << std::max(mid,vlb) << "," << vrb << "]" << std::endl;
+            std::cout << " > irb = " << irb << std::endl; 
+            std::cout << " > mid = " << mid << std::endl;
+            */
+
             if (!sdsl::empty(get<0>(c_r)) and  vlb < mid and mid) {
                //std::cout << "if 1" << std::endl;
-               ans1 =  _rel_min_obj_maj(get<0>(c_v), vlb, std::min(vrb,mid-1), get<0>(c_r), ilb);
+               ans1 =  _rel_min_obj_maj_ant(get<0>(c_v), vlb, std::min(vrb,mid-1), get<0>(c_r), ilb);
                //std::cout << ans1 << std::endl;
-               if (ans1 != m_size+1) {
+               if (ans1 != m_size + 1) {
                /*    std::cout << "**************************" << std::endl;
                    std::cout << "ans1 ans1="<< ans1 << std::endl;
                    std::cout << "ans1 offset=" << v.offset << std::endl;
                    std::cout << "ans1 rank=" << m_tree_rank(v.offset) << std::endl;
                    std::cout << "ans1 select=" << m_tree_select0(v.offset-m_tree_rank(v.offset) + ans1 + 1) << std::endl;*/
-                   ans1 = m_tree_select0(v.offset-m_tree_rank(v.offset) + ans1 + 1) - v.offset; 
+                   rnk = m_tree_rank(v.offset);
+                   ans1 = m_tree_select0(v.offset-rnk/*m_tree_rank(v.offset)*/ + ans1 + 1) - v.offset;
                }
                //std::cout << "ans1=" << ans1 << std::endl;
-            }
+            } /*else
+                std::cout << "No if 1" << std::endl;*/
             if (!sdsl::empty(get<1>(c_r)) and vrb >= mid) {
                //std::cout << "if 2" << std::endl;
-               ans2 = _rel_min_obj_maj(get<1>(c_v), std::max(mid, vlb), vrb, get<1>(c_r), mid);
+               ans2 = _rel_min_obj_maj_ant(get<1>(c_v), std::max(mid, vlb), vrb, get<1>(c_r), mid);
                //std::cout << ans2 << std::endl;
-               if (ans2 != m_size+1) {
+               if (ans2 != m_size + 1) {
                   /* std::cout << "**************************" << std::endl;
                    std::cout << "ans2 ans2="<< ans2 << std::endl;
                    std::cout << "ans2 offset=" << v.offset << std::endl;
                    std::cout << "ans2 rank=" << m_tree_rank(v.offset) << std::endl;
                    std::cout << "ans2 select=" << m_tree_select1(m_tree_rank(v.offset) + ans2 +1) << std::endl;*/
-                   ans2 = m_tree_select1(m_tree_rank(v.offset) + ans2 + 1) - v.offset;
-               }
+                   if (ans1 == m_size + 1) rnk = m_tree_rank(v.offset);
+                   ans2 = m_tree_select1(rnk/*m_tree_rank(v.offset)*/ + ans2 + 1) - v.offset;
+               } /*else
+                   std::cout << "No if 2" << std::endl;*/
                //std::cout << "ans2=" << ans2 << std::endl;
             }
-            
+
             return (ans1 < ans2)? ans1:ans2;
         }
 
@@ -1341,6 +1517,37 @@ class wm_int
             return expand(std::move(v_right));
         }
 
+        std::array<node_type, 2>
+        my_expand(const node_type& v, const range_type& r, range_type& left_int, range_type& right_int, size_type& rank_b) const
+        {
+            node_type v_left, v_right = v;
+            rank_b = m_tree_rank(v.offset);
+            size_type ones   = m_tree_rank(v.offset+v.size)-rank_b; // ones in [b..size)
+            size_type ones_p = rank_b - m_rank_level[v.level];      // ones in [level_b..b)
+
+            auto sp_rank    = m_tree_rank(v.offset + r[0]);
+            auto right_size = m_tree_rank(v.offset + r[1] + 1) - sp_rank;
+            auto left_size  = (r[1]-r[0]+1)-right_size;
+            auto right_sp = sp_rank - rank_b;
+            auto left_sp  = r[0] - right_sp;
+            
+            left_int = {left_sp, left_sp + left_size - 1};
+            right_int = {right_sp, right_sp + right_size - 1};
+
+            v_left.offset = (v.level+1)*m_size + (v.offset - v.level*m_size) - ones_p;
+            v_left.size   = v.size - ones;
+            v_left.level  = v.level + 1;
+            v_left.sym    = v.sym<<1;
+
+            v_right.offset = (v.level+1)*m_size + m_zero_cnt[v.level] + ones_p;
+            v_right.size   = ones;
+            v_right.level  = v.level + 1;
+            v_right.sym    = (v.sym<<1)|1;
+
+            return {std::move(v_left), std::move(v_right)};
+	} 
+        
+
         //! Returns the two child nodes of an inner node
         /*! \param v An inner node of a wavelet tree.
          *  \return Return a pair of nodes (left child, right child).
@@ -1441,7 +1648,7 @@ class wm_int
 
             return {{{left_sp, left_sp + left_size - 1},
                     {right_sp, right_sp + right_size - 1}
-                }
+                   }
             };
         }
 
