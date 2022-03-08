@@ -590,6 +590,8 @@ class wm_int
 
 
         // Implemented by Diego Arroyuelo
+        // Given a value x and a range [i, j], returns the lefmost k such that i \le k \le j and s[k] \ge x (here s is the indexed sequence).
+        // Returns j+1 if x is greater than any value in s[i..j].
         size_type range_next_value_pos(value_type x, size_type i, size_type j) 
         {
             if (((1ULL)<<(m_max_level))<=x) { // c is greater than any symbol in wt
@@ -645,8 +647,10 @@ class wm_int
                                           uint32_t depth, size_type b,
                                           value_type res, size_type& pos) 
         {
-            if (b+i > b+j)
+            if (b+i > b+j) {
+                pos = j+2;
                 return 0;
+            }
             else
                 if (depth == m_max_level) {
 		    pos = i+1;
@@ -668,8 +672,9 @@ class wm_int
                         b = (depth+1)*m_size + m_zero_cnt[depth] + ones_p;
                         res |= 1;
                         value_type temp = _range_next_value_pos(x, i_r, j_r, depth+1, b, res, pos);
-			pos = m_tree_select1(rank_0_b + pos) - ant_b + 1;
-			return temp;
+                        if (temp)
+			    pos = m_tree_select1(rank_0_b + pos) - ant_b + 1;
+                        return temp;
                         
                     } else { // recurse on the left child
                         size_type ant_b = b;
