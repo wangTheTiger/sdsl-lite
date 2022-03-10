@@ -590,16 +590,17 @@ class wm_int
 
 
         // Implemented by Diego Arroyuelo
-        // Given a value x and a range [i, j], returns the lefmost k such that i \le k \le j and s[k] \ge x (here s is the indexed sequence).
-        // Returns j+1 if x is greater than any value in s[i..j].
-        size_type range_next_value_pos(value_type x, size_type i, size_type j) 
+        // Given a value x and a range [i, j], returns  a pair (r, k) such that k is the lefmost index such that i \le k \le j 
+        // such that s[k] = r \ge x holds (here s is the indexed sequence). 
+        // The second component is j+1 if x is greater than any value in s[i..j].
+        std::pair<value_type,size_type> range_next_value_pos(value_type x, size_type i, size_type j) 
         {
             if (((1ULL)<<(m_max_level))<=x) { // c is greater than any symbol in wt
-                return 0;
+                return std::pair<value_type,size_type>((value_type)-1,(size_type)-1);
             }
             size_type pos;
             value_type temp = _range_next_value_pos(x, i, j, 0, 0, 0, pos);
-            return pos-1;
+            return std::pair<value_type,size_type>(temp, pos-1);
         };
 
 
@@ -674,6 +675,8 @@ class wm_int
                         value_type temp = _range_next_value_pos(x, i_r, j_r, depth+1, b, res, pos);
                         if (temp)
 			    pos = m_tree_select1(rank_0_b + pos) - ant_b + 1;
+                        else
+                            pos = j+2;
                         return temp;
                         
                     } else { // recurse on the left child
