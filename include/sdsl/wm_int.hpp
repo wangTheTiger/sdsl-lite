@@ -608,7 +608,10 @@ class wm_int
                                               uint32_t depth, size_type b,
                                               value_type res, size_type& pos)
         {
-            if (b+i > b+j) return 0;
+            if (b+i > b+j) {
+                pos = j+2;
+                return 0;
+            }
 
             if (depth == m_max_level) {
 	        pos = i+1;
