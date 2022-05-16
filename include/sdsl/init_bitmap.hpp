@@ -27,115 +27,114 @@
 
 using namespace std;
 
-class initializable_bitmap
+namespace sdsl
 {
-    uint64_t D;          // array size
-    uint64_t init_value; // value used to initialize bitmap B[D].
-
-
-    uint64_t *S;
-    uint64_t top;
-
-    uint64_t *U; // auxiliary array
-
-    uint64_t *B;
-
-public:
-    initializable_bitmap() = default;
-
-    initializable_bitmap(const uint64_t _D, uint64_t _init_value)
+    class initializable_bitmap
     {
-        D = _D / 64;
-        top = 0;
-        S = new uint64_t[D];
-        U = new uint64_t[D];
-        B = new uint64_t[D];
-        init_value = _init_value;
-    };
+        uint64_t D;          // array size
+        uint64_t init_value; // value used to initialize bitmap B[D].
 
-    void init(const uint64_t _D, uint64_t _init_value)
-    {
-        D = _D / 64;
-        top = 0;
-        S = new uint64_t[D];
-        U = new uint64_t[D];
-        init_value = _init_value;
-        B = new uint64_t[D];
-    };
+        uint64_t *S;
+        uint64_t top;
 
-    ~initializable_bitmap()
-    {
-        delete[] S;
-        delete[] U;
-        delete[] B;
-    };
+        uint64_t *U; // auxiliary array
 
+        uint64_t *B;
 
-    //! Returns a mem. address (entire word)
-    uint64_t operator[](const uint64_t _i) const
-    {
-        const int i = _i / 64;
-        if (i > D)
+    public:
+        initializable_bitmap() = default;
+
+        initializable_bitmap(const uint64_t _D, uint64_t _init_value)
         {
-            cerr << "Caution init_bitmap.hpp: index " << i << " is greater than bitmap size " << D << endl;
-        }
-        //std::cout << "U[i] = " << U[i] << " top = " << top << " S[U[i]] = " << S[U[i]] << " i = " << i << std::endl;
-        if (U[i] < top && S[U[i]] == i)
-            return B[i];
-        else
-            return init_value;
-    };
+            D = _D / 64;
+            top = 0;
+            S = new uint64_t[D];
+            U = new uint64_t[D];
+            B = new uint64_t[D];
+            init_value = _init_value;
+        };
 
-    //! Returns the value of a specific bit in the bitmap.
-    uint64_t atPos(const uint64_t _i) const
-    {
-        const int i = _i / 64;
-        if (i > D)
+        void init(const uint64_t _D, uint64_t _init_value)
         {
-            cerr << "Caution init_bitmap.hpp function atPos: index " << i << " is greater than bitmap size " << D << endl;
-        }
+            D = _D / 64;
+            top = 0;
+            S = new uint64_t[D];
+            U = new uint64_t[D];
+            init_value = _init_value;
+            B = new uint64_t[D];
+        };
 
-        //std::cout << "U[i] = " << U[i] << " top = " << top << " S[U[i]] = " << S[U[i]] << " i = " << i << std::endl;
-        if (U[i] < top && S[U[i]] == i)
-            //If we are here the B[i] (size uint64_t), therefore we return the value of the specific requested bit.
-            //B[i] bits are right shifted (_i % 64) positions.
-            return (B[i] >> (_i % 64) & 1ULL);
-        else
-            return init_value;
-    };
-
-    //! Initializes a bitmap cell (whole word) as 'init_value' and returns its mem. address.
-    uint64_t &operator[](uint64_t _i)
-    {
-        const int i = _i / 64;
-        if (i > D)
+        ~initializable_bitmap()
         {
-            cerr << "Caution init_bitmap.hpp operator uint64_t& [uint64_t i]: index " << i << " is greater than bitmap size " << D << endl;
-        }
+            delete[] S;
+            delete[] U;
+            delete[] B;
+        };
 
-        if (U[i] < top && S[U[i]] == i)
+        //! Returns a mem. address (entire word)
+        uint64_t operator[](const uint64_t _i) const
         {
-            return B[i]; //Returning the memory address of bitmap[i] (uint64_t).
-        }
-        else
+            const int i = _i / 64;
+            if (i > D)
+            {
+                cerr << "Caution init_bitmap.hpp: index " << i << " is greater than bitmap size " << D << endl;
+            }
+            //std::cout << "U[i] = " << U[i] << " top = " << top << " S[U[i]] = " << S[U[i]] << " i = " << i << std::endl;
+            if (U[i] < top && S[U[i]] == i)
+                return B[i];
+            else
+                return init_value;
+        };
+
+        //! Returns the value of a specific bit in the bitmap.
+        uint64_t atPos(const uint64_t _i) const
         {
-            U[i] = top;
-            S[top++] = i;
-            B[i] = init_value; // The whole bitmap cell (8 bytes) is initialized as 'init_value'.
-            return B[i];       //Returns memory address of the bitmap cell.
-        }
-    };
+            const int i = _i / 64;
+            if (i > D)
+            {
+                cerr << "Caution init_bitmap.hpp function atPos: index " << i << " is greater than bitmap size " << D << endl;
+            }
 
-    uint64_t size()
-    {
-        return D;
-    };
+            //std::cout << "U[i] = " << U[i] << " top = " << top << " S[U[i]] = " << S[U[i]] << " i = " << i << std::endl;
+            if (U[i] < top && S[U[i]] == i)
+                //If we are here the B[i] (size uint64_t), therefore we return the value of the specific requested bit.
+                //B[i] bits are right shifted (_i % 64) positions.
+                return (B[i] >> (_i % 64) & 1ULL);
+            else
+                return init_value;
+        };
 
-    uint64_t size_in_bytes()
-    {
-        return 3 * sizeof(uint64_t) * D /*three arrays of size D*/ + sizeof(uint64_t) * 3 /*three uint64_t variables*/;
+        //! Initializes a bitmap cell (whole word) as 'init_value' and returns its mem. address.
+        uint64_t &operator[](uint64_t _i)
+        {
+            const int i = _i / 64;
+            if (i > D)
+            {
+                cerr << "Caution init_bitmap.hpp operator uint64_t& [uint64_t i]: index " << i << " is greater than bitmap size " << D << endl;
+            }
+
+            if (U[i] < top && S[U[i]] == i)
+            {
+                return B[i]; //Returning the memory address of bitmap[i] (uint64_t).
+            }
+            else
+            {
+                U[i] = top;
+                S[top++] = i;
+                B[i] = init_value; // The whole bitmap cell (8 bytes) is initialized as 'init_value'.
+                return B[i];       //Returns memory address of the bitmap cell.
+            }
+        };
+
+        uint64_t size()
+        {
+            return D;
+        };
+
+        uint64_t size_in_bytes()
+        {
+            return 3 * sizeof(uint64_t) * D /*three arrays of size D*/ + sizeof(uint64_t) * 3 /*three uint64_t variables*/;
+        };
     };
-};
 }
-
 #endif
