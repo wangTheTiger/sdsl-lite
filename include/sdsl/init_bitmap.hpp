@@ -135,6 +135,27 @@ namespace sdsl
         {
             return 3 * sizeof(uint64_t) * D /*three arrays of size D*/ + sizeof(uint64_t) * 3 /*three uint64_t variables*/;
         };
+
+        /*
+        Sets a specific bit with the += operator.
+        IMPORTANT: https://en.cppreference.com/w/cpp/language/operators
+        !!! It is expected to return the left hand side (lhs) operand by reference.!!!
+        */
+        initializable_bitmap &operator+=(const uint64_t bit_to_set)
+        {
+            B[bit_to_set] |= 1ULL << (bit_to_set % 64); //64 = sizeof(uint64_t) * 8.
+            return *this;
+        }
+        /*
+        Clears a specific bit with the += operator.
+        IMPORTANT: https://en.cppreference.com/w/cpp/language/operators
+        !!! It is expected to return the left hand side (lhs) operand by reference.!!!
+        */
+        initializable_bitmap &operator-=(const uint64_t bit_to_set)
+        {
+            B[bit_to_set] |= 0ULL << (bit_to_set % 64); //64 = sizeof(uint64_t) * 8.
+            return *this;
+        }
     };
 }
 #endif
