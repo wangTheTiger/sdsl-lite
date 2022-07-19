@@ -1295,7 +1295,54 @@ class wm_int
             return (ans1 < ans2)? ans1:ans2;
         }
 
+    //Implemented by Adrian Gomez-Brandon
+    //! count_range_search_2d searches points in the index interval [lb..rb] and value interval [vlb..vrb].
+    /*! \param lb     Left bound of index interval (inclusive)
+     *  \param rb     Right bound of index interval (inclusive)
+     *  \param vlb    Left bound of value interval (inclusive)
+     *  \param vrb    Right bound of value interval (inclusive)
+     *  \return  #of points in the ranges
+     */
 
+
+    size_type count_range_search_2d(size_type lb, size_type rb,
+                                    value_type vlb, value_type vrb) const{
+
+        typedef struct {
+            node_type node;
+            range_type range;
+            size_type ilb;
+            size_type irb;
+        } nrv_type;
+
+        typedef std::stack<nrv_type> stack_type;
+
+
+        auto nvrb = (1ULL<< m_max_level)-1;
+        vrb = (vrb > nvrb) ? nvrb : vrb;
+
+        size_type cnt_answers = 0;
+        stack_type stack;
+        stack.emplace(nrv_type{root(), {lb, rb}, 0, nvrb});
+        while (!stack.empty()) {
+            nrv_type x = stack.top(); stack.pop();
+            if(is_leaf(x.node) || (vlb >= x.ilb && x.irb <= vrb)) {
+                cnt_answers += sdsl::size(x.range);
+            }else{
+                auto child        = expand(x.node);
+                auto child_ranges = expand(x.node, x.range);
+                auto mid          = (x.ilb + x.irb+1)>>1;
+
+                if(!sdsl::empty(get<0>(child_ranges)) && mid && vlb < mid) {
+                    stack.emplace(nrv_type{get<0>(child), get<0>(child_ranges), x.ilb, mid - 1});
+                }
+                if(!sdsl::empty(get<1>(child_ranges)) && vrb >= mid) {
+                    stack.emplace(nrv_type{get<1>(child), get<1>(child_ranges), mid, x.irb});
+                }
+            }
+        }
+        return cnt_answers;
+    }
         //! range_search_2d searches points in the index interval [lb..rb] and value interval [vlb..vrb].
         /*! \param lb     Left bound of index interval (inclusive)
          *  \param rb     Right bound of index interval (inclusive)
