@@ -17,6 +17,38 @@ struct _interval_symbols_wt;
 template<typename, typename T>
 struct has_expand;
 
+//! Intersection of elements in two wavelet trees WT1 and TW2: WT1[s_0,e_0], WT1[s_1,e_1],...,WT1[s_k,e_k] & WT2[s_0,e_0], WT2[s_1,e_1],...,WT2[s_k,e_k]
+/*! \param wt1     The first wavelet tree object.
+/*  \param wt2     The second wavelet tree object.
+ *  \param ranges The ranges.
+ *  \param t      Threshold in how many distinct ranges the value has to be
+ *                present. Default: t=ranges.size()
+ *  \return       A vector containing (value, frequency) - of value which are
+ *                contained in t different ranges. Frequency = accumulated
+ *                frequencies in all ranges. The tuples are ordered according
+ *                to value, if t_wt::lex_ordered=1.
+ */
+template<class t_wt>
+std::vector< std::pair<typename t_wt::value_type, typename t_wt::size_type> >
+intersect(const t_wt& wt1, const t_wt& wt2, const std::vector<range_type>& ranges, typename t_wt::size_type t=0)
+{
+    using size_type      = typename t_wt::size_type;
+    using value_type     = typename t_wt::value_type;
+    using p_t = std::pair<value_type,size_type>;
+    std::vector<p_t> res1, res2, res;
+    res1 = intersect(wt1, ranges, t);
+    res2 = intersect(wt2, ranges, t);
+    for (int i = 0 ; i < res1.size() ; i++){
+        for (int j = 0; j < res2.size(); j++){
+            if(res1[i].first == res2[j].first){
+                auto& p = p_t(res2[j].first, res1[i].second + res2[j].second);
+                res.emplace_back(p);
+            }
+        }
+    }
+    return res;
+}
+
 //! Intersection of elements in WT[s_0,e_0], WT[s_1,e_1],...,WT[s_k,e_k]
 /*! \param wt     The wavelet tree object.
  *  \param ranges The ranges.
